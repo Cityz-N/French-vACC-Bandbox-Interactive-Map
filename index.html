@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>French vACC Bandbox Interactive Map</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+
+<style>
+
+:root {
+    --panel-bg: rgba(15, 15, 15, 0.92);
+    --panel-text: #ffffff;
+    --button-bg: rgba(30, 30, 30, 0.95);
+    --button-text: #ffffff;
+    --search-bg: rgba(20, 20, 20, 0.95);
+    --search-text: #ffffff;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+#map {
+    width: 100vw;
+    height: 100vh;
+}
+
+/* Search */
+
+#searchBox {
+    position: fixed;
+    z-index: 1000;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    width: min(350px, 70vw);
+    padding: 10px 14px;
+
+    border: none;
+    border-radius: 12px;
+
+    background: var(--search-bg);
+    color: var(--search-text);
+
+    font-size: 15px;
+    outline: none;
+}
+
+
+/* Theme button */
+
+#themeButton {
+    position: fixed;
+    z-index: 1000;
+
+    top: 15px;
+    right: 15px;
+
+    padding: 10px 15px;
+
+    border: none;
+    border-radius: 12px;
+
+    background: var(--button-bg);
+    color: var(--button-text);
+
+    cursor: pointer;
+
+    font-size: 14px;
+}
+
+
+/* Bottom information bar */
+
+.infoBar {
+
+    position: fixed;
+    z-index: 1000;
+
+    left: 15px;
+    bottom: 15px;
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    padding: 8px 14px;
+
+    border-radius: 12px;
+
+    background: var(--panel-bg);
+    color: var(--panel-text);
+
+    font-size: 14px;
+
+    backdrop-filter: blur(8px);
+}
+
+
+.logoContainer {
+
+    height: 28px;
+
+    display: flex;
+    align-items: center;
+}
+
+
+.logoContainer.lightMode {
+
+    background: #000000;
+
+    padding: 3px 7px;
+
+    border-radius: 7px;
+}
+
+
+.logoContainer img {
+
+    height: 24px;
+
+    width: auto;
+
+    display: block;
+}
+
+
+/* Radar marker */
+
+.radarMarker {
+
+    width: 18px;
+    height: 18px;
+
+    border-radius: 50%;
+
+    border: 2px solid white;
+
+    box-shadow:
+        0 0 8px currentColor,
+        0 0 14px currentColor;
+
+    transition: transform 0.2s ease;
+}
+
+
+.radarMarker:hover {
+
+    transform: scale(1.35);
+
+}
+
+
+/* Tooltip */
+
+.leaflet-tooltip {
+
+    background: rgba(15,15,15,0.95);
+
+    color: white;
+
+    border: none;
+
+    border-radius: 8px;
+
+    padding: 8px 12px;
+
+    font-size: 13px;
+
+    line-height: 1.4;
+
+}
+
+
+.leaflet-tooltip-top:before {
+
+    border-top-color: rgba(15,15,15,0.95);
+
+}
+
+
+/* Light theme */
+
+body.light {
+
+    --panel-bg: rgba(255,255,255,0.9);
+    --panel-text: #111111;
+
+    --button-bg: rgba(255,255,255,0.95);
+    --button-text: #111111;
+
+    --search-bg: rgba(255,255,255,0.95);
+    --search-text: #111111;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<input 
+    id="searchBox"
+    placeholder="Search city, approach or callsign..."
+>
+
+
+<button id="themeButton">
+    ☀ Light
+</button>
+
+
+<div id="map"></div>
+
+
+<div class="infoBar">
+
+    <span id="logoContainer" class="logoContainer">
+        <img src="https://vatsim.fr/assets/img/logo_light.png">
+    </span>
+
+    <span>
+        French vACC Bandbox interactive map
+    </span>
+
+    <span>|</span>
+
+    <span id="themeLabel">
+        Theme: Dark
+    </span>
+
+</div>
+
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+
+const approaches = [
+
+    {
+        city: "Bordeaux",
+        name: "Aquitaine Approach",
+        callsign: "LFBD_BE_APP",
+        lat: 44.8333,
+        lon: -0.6000,
+        color: "#00BCD4"
+    },
+
+    {
+        city: "Toulouse",
+        name: "Toulouse Approach",
+        callsign: "LFBO_AE_APP",
+        lat: 43.6167,
+        lon: 1.4500,
+        color: "#FF9800"
+    },
+
+    {
+        city: "Paris",
+        name: "De Gaulle Approach",
+        callsign: "LFPG_N_APP",
+        lat: 48.8333,
+        lon: 2.3333,
+        color: "#4CAF50"
+    },
+
+    {
+        city: "Seine",
+        name: "Seine Approach",
+        callsign: "LFPM_SJ_APP",
+        lat: 48.4333,
+        lon: 2.1667,
+        color: "#E91E63"
+    },
+
+    {
+        city: "Lille",
+        name: "Lille Approach",
+        callsign: "LFQQ_QE_APP",
+        lat: 50.6333,
+        lon: 3.0500,
+        color: "#9C27B0"
+    },
+
+    {
+        city: "Strasbourg",
+        name: "Strasbourg Control",
+        callsign: "LFST_SU_APP",
+        lat: 48.5333,
+        lon: 7.6167,
+        color: "#03A9F4"
+    },
+
+    {
+        city: "Bastia",
+        name: "Bastia Approach",
+        callsign: "LFKB_KB_APP",
+        lat: 42.6667,
+        lon: 9.5000,
+        color: "#FFC107"
+    },
+
+    {
+        city: "Clermont-Ferrand",
+        name: "Clermont Approach",
+        callsign: "LFLC_CF_APP",
+        lat: 45.7667,
+        lon: 3.0667,
+        color: "#8BC34A"
+    },
+
+    {
+        city: "Lyon",
+        name: "Lyon Approach",
+        callsign: "LFLL_VW_APP",
+        lat: 45.7500,
+        lon: 4.8333,
+        color: "#FF5722"
+    },
+
+    {
+        city: "Marseille",
+        name: "Provence Approach",
+        callsign: "LFML_ME_APP",
+        lat: 43.3000,
+        lon: 5.3833,
+        color: "#795548"
+    },
+
+    {
+        city: "Nice",
+        name: "Nice Approach",
+        callsign: "LFMN_NO_APP",
+        lat: 43.7000,
+        lon: 7.2333,
+        color: "#673AB7"
+    },
+
+    {
+        city: "Montpellier",
+        name: "Montpellier Approach",
+        callsign: "LFMT_FE_APP",
+        lat: 43.6167,
+        lon: 3.8667,
+        color: "#009688"
+    },
+
+    {
+        city: "Rennes",
+        name: "Rennes Approach",
+        callsign: "LFRN_RN_APP",
+        lat: 48.1167,
+        lon: -1.6833,
+        color: "#607D8B"
+    },
+
+    {
+        city: "Nantes",
+        name: "Nantes Approach",
+        callsign: "LFRS_RS_APP",
+        lat: 47.2000,
+        lon: -1.5500,
+        color: "#F44336"
+    }
+
+];
+
+
+
+let darkMode = true;
+
+
+
+const map = L.map("map", {
+
+    zoomControl: true,
+
+    attributionControl: false
+
+}).setView([46.7, 2.3], 6);
+
+
+
+let darkTiles = L.tileLayer(
+
+    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+
+).addTo(map);
+
+
+
+let lightTiles = L.tileLayer(
+
+    "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+
+);
+
+
+
+const markers = [];
+
+
+
+function createMarker(position) {
+
+
+    const icon = L.divIcon({
+
+        className: "",
+
+        html:
+        `
+        <div 
+            class="radarMarker"
+            style="
+                background:${position.color};
+                color:${position.color};
+            ">
+        </div>
+        `,
+
+        iconSize: [22,22],
+
+        iconAnchor: [11,11]
+
+    });
+
+
+
+    const marker = L.marker(
+
+        [
+            position.lat,
+            position.lon
+        ],
+
+        {
+            icon: icon
+        }
+
+    ).addTo(map);
+
+
+
+    marker.bindTooltip(
+
+        `
+        ${position.city}<br>
+        ${position.name}<br>
+        ${position.callsign}
+        `,
+
+        {
+            direction: "top",
+            offset: [0,-8]
+        }
+
+    );
+
+
+    markers.push({
+
+        marker: marker,
+
+        data: position
+
+    });
+
+}
+
+
+
+approaches.forEach(createMarker);
+
+
+
+const searchBox = document.getElementById("searchBox");
+
+
+
+searchBox.addEventListener(
+
+    "input",
+
+    function(){
+
+        const query = this.value
+            .toLowerCase()
+            .trim();
+
+
+        if(query.length < 2)
+            return;
+
+
+
+        const result = markers.find(item => {
+
+
+            const searchable =
+
+                item.data.city + " " +
+                item.data.name + " " +
+                item.data.callsign;
+
+
+            return searchable
+                .toLowerCase()
+                .includes(query);
+
+
+        });
+
+
+
+        if(result){
+
+            map.flyTo(
+
+                result.marker.getLatLng(),
+
+                8,
+
+                {
+                    duration: 1
+                }
+
+            );
+
+
+            result.marker.openTooltip();
+
+        }
+
+
+    }
+
+);
+
+
+
+const themeButton = document.getElementById("themeButton");
+
+const themeLabel = document.getElementById("themeLabel");
+
+const logoContainer = document.getElementById("logoContainer");
+
+
+
+themeButton.addEventListener(
+
+    "click",
+
+    function(){
+
+
+        darkMode = !darkMode;
+
+
+
+        if(darkMode){
+
+
+            map.removeLayer(lightTiles);
+
+            darkTiles.addTo(map);
+
+
+
+            document.body.classList.remove("light");
+
+
+
+            themeButton.textContent = "☀ Light";
+
+
+            themeLabel.textContent = "Theme: Dark";
+
+
+
+            logoContainer.classList.remove("lightMode");
+
+
+
+        }
+
+        else{
+
+
+            map.removeLayer(darkTiles);
+
+            lightTiles.addTo(map);
+
+
+
+            document.body.classList.add("light");
+
+
+
+            themeButton.textContent = "🌙 Dark";
+
+
+            themeLabel.textContent = "Theme: Light";
+
+
+
+            logoContainer.classList.add("lightMode");
+
+
+
+        }
+
+
+    }
+
+);
+
+
+
+</script>
+
+</body>
+
+</html>
