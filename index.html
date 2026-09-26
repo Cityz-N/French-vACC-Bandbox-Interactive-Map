@@ -31,16 +31,34 @@ body {
     height: 100vh;
 }
 
-/* Search */
+
+/* =========================
+   DARK OSM MAP
+   ========================= */
+
+.dark-map-tiles {
+    filter:
+        invert(1)
+        hue-rotate(180deg)
+        brightness(0.75)
+        contrast(1.1);
+}
+
+
+/* =========================
+   SEARCH
+   ========================= */
 
 #searchBox {
     position: fixed;
     z-index: 1000;
+
     top: 15px;
     left: 50%;
     transform: translateX(-50%);
 
     width: min(350px, 70vw);
+
     padding: 10px 14px;
 
     border: none;
@@ -51,10 +69,14 @@ body {
 
     font-size: 15px;
     outline: none;
+
+    box-sizing: border-box;
 }
 
 
-/* Theme button */
+/* =========================
+   THEME BUTTON
+   ========================= */
 
 #themeButton {
     position: fixed;
@@ -77,10 +99,11 @@ body {
 }
 
 
-/* Bottom information bar */
+/* =========================
+   INFORMATION BAR
+   ========================= */
 
 .infoBar {
-
     position: fixed;
     z-index: 1000;
 
@@ -105,7 +128,6 @@ body {
 
 
 .logoContainer {
-
     height: 28px;
 
     display: flex;
@@ -114,7 +136,6 @@ body {
 
 
 .logoContainer.lightMode {
-
     background: #000000;
 
     padding: 3px 7px;
@@ -124,19 +145,18 @@ body {
 
 
 .logoContainer img {
-
     height: 24px;
-
     width: auto;
 
     display: block;
 }
 
 
-/* Radar marker */
+/* =========================
+   RADAR MARKERS
+   ========================= */
 
 .radarMarker {
-
     width: 18px;
     height: 18px;
 
@@ -153,22 +173,20 @@ body {
 
 
 .radarMarker:hover {
-
     transform: scale(1.35);
-
 }
 
 
-/* Tooltip */
+/* =========================
+   TOOLTIP
+   ========================= */
 
 .leaflet-tooltip {
-
-    background: rgba(15,15,15,0.95);
+    background: rgba(15, 15, 15, 0.95);
 
     color: white;
 
     border: none;
-
     border-radius: 8px;
 
     padding: 8px 12px;
@@ -176,63 +194,86 @@ body {
     font-size: 13px;
 
     line-height: 1.4;
-
 }
 
 
 .leaflet-tooltip-top:before {
-
-    border-top-color: rgba(15,15,15,0.95);
-
+    border-top-color: rgba(15, 15, 15, 0.95);
 }
 
 
-/* Light theme */
+/* =========================
+   LIGHT THEME
+   ========================= */
 
 body.light {
-
-    --panel-bg: rgba(255,255,255,0.9);
+    --panel-bg: rgba(255, 255, 255, 0.9);
     --panel-text: #111111;
 
-    --button-bg: rgba(255,255,255,0.95);
+    --button-bg: rgba(255, 255, 255, 0.95);
     --button-text: #111111;
 
-    --search-bg: rgba(255,255,255,0.95);
+    --search-bg: rgba(255, 255, 255, 0.95);
     --search-text: #111111;
-
 }
 
 </style>
 
 </head>
 
+
 <body>
 
-<input 
+
+<!-- =========================
+     SEARCH
+     ========================= -->
+
+<input
     id="searchBox"
     placeholder="Search city, approach or callsign..."
 >
 
+
+<!-- =========================
+     THEME BUTTON
+     ========================= -->
 
 <button id="themeButton">
     ☀ Light
 </button>
 
 
+<!-- =========================
+     MAP
+     ========================= -->
+
 <div id="map"></div>
 
+
+<!-- =========================
+     INFORMATION BAR
+     ========================= -->
 
 <div class="infoBar">
 
     <span id="logoContainer" class="logoContainer">
-        <img src="https://vatsim.fr/assets/img/logo_light.png">
+
+        <img
+            src="https://vatsim.fr/assets/img/logo_light.png"
+            alt="VATSIM France"
+        >
+
     </span>
+
 
     <span>
         French vACC Bandbox interactive map
     </span>
 
+
     <span>|</span>
+
 
     <span id="themeLabel">
         Theme: Dark
@@ -243,7 +284,13 @@ body.light {
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
+
 <script>
+
+
+/* =========================
+   APPROACH DATA
+   ========================= */
 
 const approaches = [
 
@@ -254,15 +301,6 @@ const approaches = [
         lat: 44.8333,
         lon: -0.6000,
         color: "#00BCD4"
-    },
-
-    {
-        city: "Bâle-Mulhouse",
-        name: "Bale Control",
-        callsign: "LFSB_C_APP",
-        lat: 47.4000,
-        lon: 7.2000,
-        color: "#FC3649"
     },
 
     {
@@ -385,65 +423,78 @@ const approaches = [
 ];
 
 
+/* =========================
+   MAP SETUP
+   ========================= */
 
 let darkMode = true;
 
 
-
 const map = L.map("map", {
+    zoomControl: true
+}).setView(
+    [46.7, 2.3],
+    6
+);
 
-    zoomControl: true,
 
-    attributionControl: false
-
-}).setView([46.7, 2.3], 6);
-
-
+/* =========================
+   OPENSTREETMAP TILES
+   ========================= */
 
 let darkTiles = L.tileLayer(
 
-    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+
+    {
+        attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a>',
+
+        className: "dark-map-tiles"
+    }
 
 ).addTo(map);
 
 
-
 let lightTiles = L.tileLayer(
 
-    "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+
+    {
+        attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a>'
+    }
 
 );
 
 
+/* =========================
+   MARKERS
+   ========================= */
 
 const markers = [];
 
 
-
 function createMarker(position) {
-
 
     const icon = L.divIcon({
 
         className: "",
 
         html:
-        `
-        <div 
-            class="radarMarker"
-            style="
-                background:${position.color};
-                color:${position.color};
-            ">
-        </div>
-        `,
+            `<div
+                class="radarMarker"
+                style="
+                    background:${position.color};
+                    color:${position.color};
+                "
+            ></div>`,
 
-        iconSize: [22,22],
+        iconSize: [22, 22],
 
-        iconAnchor: [11,11]
+        iconAnchor: [11, 11]
 
     });
-
 
 
     const marker = L.marker(
@@ -460,18 +511,13 @@ function createMarker(position) {
     ).addTo(map);
 
 
-
     marker.bindTooltip(
 
-        `
-        ${position.city}<br>
-        ${position.name}<br>
-        ${position.callsign}
-        `,
+        `${position.city}<br>${position.name}<br>${position.callsign}`,
 
         {
             direction: "top",
-            offset: [0,-8]
+            offset: [0, -8]
         }
 
     );
@@ -488,51 +534,53 @@ function createMarker(position) {
 }
 
 
+/* Create all markers */
 
 approaches.forEach(createMarker);
 
 
+/* =========================
+   SEARCH
+   ========================= */
 
-const searchBox = document.getElementById("searchBox");
-
+const searchBox =
+    document.getElementById("searchBox");
 
 
 searchBox.addEventListener(
-
     "input",
+    function() {
 
-    function(){
-
-        const query = this.value
-            .toLowerCase()
-            .trim();
-
-
-        if(query.length < 2)
-            return;
-
-
-
-        const result = markers.find(item => {
-
-
-            const searchable =
-
-                item.data.city + " " +
-                item.data.name + " " +
-                item.data.callsign;
-
-
-            return searchable
+        const query =
+            this.value
                 .toLowerCase()
-                .includes(query);
+                .trim();
 
 
-        });
+        if (query.length < 2) {
+            return;
+        }
 
 
+        const result =
+            markers.find(item => {
 
-        if(result){
+                const searchable =
+                    item.data.city +
+                    " " +
+                    item.data.name +
+                    " " +
+                    item.data.callsign;
+
+
+                return searchable
+                    .toLowerCase()
+                    .includes(query);
+
+            });
+
+
+        if (result) {
 
             map.flyTo(
 
@@ -551,93 +599,97 @@ searchBox.addEventListener(
 
         }
 
-
     }
-
 );
 
 
+/* =========================
+   THEME SWITCHING
+   ========================= */
 
-const themeButton = document.getElementById("themeButton");
+const themeButton =
+    document.getElementById("themeButton");
 
-const themeLabel = document.getElementById("themeLabel");
 
-const logoContainer = document.getElementById("logoContainer");
+const themeLabel =
+    document.getElementById("themeLabel");
 
+
+const logoContainer =
+    document.getElementById("logoContainer");
 
 
 themeButton.addEventListener(
-
     "click",
-
-    function(){
-
+    function() {
 
         darkMode = !darkMode;
 
 
+        if (darkMode) {
 
-        if(darkMode){
-
+            /* Switch to dark map */
 
             map.removeLayer(lightTiles);
 
             darkTiles.addTo(map);
 
 
+            /* Dark interface */
 
             document.body.classList.remove("light");
 
 
-
-            themeButton.textContent = "☀ Light";
-
-
-            themeLabel.textContent = "Theme: Dark";
+            themeButton.textContent =
+                "☀ Light";
 
 
+            themeLabel.textContent =
+                "Theme: Dark";
 
-            logoContainer.classList.remove("lightMode");
 
-
+            logoContainer.classList.remove(
+                "lightMode"
+            );
 
         }
 
-        else{
 
+        else {
+
+            /* Switch to light map */
 
             map.removeLayer(darkTiles);
 
             lightTiles.addTo(map);
 
 
+            /* Light interface */
 
             document.body.classList.add("light");
 
 
-
-            themeButton.textContent = "🌙 Dark";
-
-
-            themeLabel.textContent = "Theme: Light";
+            themeButton.textContent =
+                "🌙 Dark";
 
 
+            themeLabel.textContent =
+                "Theme: Light";
 
-            logoContainer.classList.add("lightMode");
 
+            /* Put white VATSIM logo on black */
 
+            logoContainer.classList.add(
+                "lightMode"
+            );
 
         }
 
-
     }
-
 );
-
 
 
 </script>
 
 </body>
-
 </html>
