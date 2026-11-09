@@ -60,6 +60,15 @@ body { margin: 0; padding: 0; overflow: hidden; font-family: Arial, Helvetica, s
 .sub a, #panel a { color: var(--accent); }
 section { border-top: 1px solid var(--panel-line); margin-top: 11px; padding-top: 10px; }
 h2 { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; margin: 0 0 7px; color: var(--panel-muted); font-weight: 700; }
+section.collapsed h2 { margin-bottom: 0; }
+section.collapsed > :not(h2) { display: none; }
+.sectionToggle {
+    display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0; border: 0;
+    background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer;
+}
+.sectionToggle:hover { color: var(--panel-text); }
+.sectionChevron { font-size: 10px; transition: transform .15s; }
+section.collapsed .sectionChevron { transform: rotate(-90deg); }
 
 .seg { display: flex; border: 1px solid var(--panel-line); border-radius: 8px; overflow: hidden; }
 .seg button { flex: 1; border: 0; background: transparent; color: var(--panel-text); padding: 6px 4px; cursor: pointer; font-size: 12.5px; }
@@ -935,6 +944,45 @@ byId("themeButton").addEventListener("click", function () {
 });
 
 byId("panelButton").addEventListener("click", () => byId("panel").classList.toggle("open"));
+
+
+/* =========================
+   COLLAPSIBLE PANEL SECTIONS
+   ========================= */
+
+const COLLAPSED_KEY = "approachSectors.collapsedSections";
+
+function loadCollapsed() {
+    try { return new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY)) || []); }
+    catch (err) { return new Set(); }
+}
+
+function saveCollapsed(titles) {
+    try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...titles])); }
+    catch (err) { /* private mode: collapsing still works for this visit */ }
+}
+
+const collapsedTitles = loadCollapsed();
+
+document.querySelectorAll("#panelScroll section").forEach(section => {
+    const heading = section.querySelector("h2");
+    const title = heading.textContent;
+    heading.innerHTML = `<button type="button" class="sectionToggle">
+        <span>${escapeHtml(title)}</span><span class="sectionChevron" aria-hidden="true">▾</span></button>`;
+    const toggle = heading.firstElementChild;
+
+    const apply = () => {
+        const collapsed = collapsedTitles.has(title);
+        section.classList.toggle("collapsed", collapsed);
+        toggle.setAttribute("aria-expanded", !collapsed);
+    };
+    toggle.addEventListener("click", () => {
+        collapsedTitles.has(title) ? collapsedTitles.delete(title) : collapsedTitles.add(title);
+        saveCollapsed(collapsedTitles);
+        apply();
+    });
+    apply();
+});
 
 if (linkedApp) {
     treeRefs.find(t => t.app === linkedApp).details.open = true;
