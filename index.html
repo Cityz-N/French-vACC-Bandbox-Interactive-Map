@@ -203,6 +203,36 @@ body {
 
 
 /* =========================
+   POPUP
+   ========================= */
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+    background: rgba(15, 15, 15, 0.95);
+    color: white;
+}
+
+
+.leaflet-popup-content {
+    margin: 10px 24px 10px 12px;
+
+    font-size: 13px;
+
+    line-height: 1.4;
+}
+
+
+.leaflet-popup-content a {
+    color: #4fc3f7;
+}
+
+
+.noSectors {
+    color: #a8a8a8;
+}
+
+
+/* =========================
    LIGHT THEME
    ========================= */
 
@@ -583,6 +613,31 @@ let lightTiles = L.tileLayer(
 const markers = [];
 
 
+/* Positions with no sectors published in AIP ENR 2.2.4.2 */
+
+const noPublishedSectors = new Set([
+    "LFPG_N_APP",
+    "LFPO_APP",
+    "LFPT_APP",
+    "LFLB_APP"
+]);
+
+
+function sectorsLine(position) {
+
+    if (noPublishedSectors.has(position.callsign)) {
+        return `<span class="noSectors">No sectors published in the AIP</span>`;
+    }
+
+    const url =
+        "approach-sectors.html?app=" +
+        encodeURIComponent(position.callsign);
+
+    return `<a href="${url}" target="_blank" rel="noopener">View detailed APP sectors</a>`;
+
+}
+
+
 function createMarker(position) {
 
     const icon = L.divIcon({
@@ -629,6 +684,22 @@ function createMarker(position) {
         }
 
     );
+
+
+    /* A tooltip closes on mouse-out, so the link lives in a click popup */
+
+    marker.bindPopup(
+
+        `${position.city}<br>${position.name}<br>${position.callsign}<br>${sectorsLine(position)}`,
+
+        {
+            offset: [0, -6]
+        }
+
+    );
+
+
+    marker.on("popupopen", () => marker.closeTooltip());
 
 
     markers.push({
