@@ -83,8 +83,8 @@ input[type=range] { width: 100%; margin: 5px 0 0; accent-color: var(--accent); }
 
 .check { display: flex; align-items: flex-start; gap: 7px; padding: 3px 0; cursor: pointer; line-height: 1.3; }
 .check input { margin: 1px 0 0; accent-color: var(--accent); flex: none; }
-.adRow { margin-bottom: 4px; }
-.adRow .name { display: block; margin-bottom: 5px; }
+.runwayRow { margin-bottom: 4px; }
+.runwayRow .name { display: block; margin-bottom: 5px; }
 .note { color: var(--panel-muted); font-size: 11.5px; line-height: 1.4; margin: 6px 0 0; }
 
 .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 11.5px; color: var(--panel-muted); }
@@ -170,6 +170,15 @@ body.light .leaflet-tooltip.sectorLabel { color: #111; text-shadow: 0 0 3px #fff
   <div id="panelScroll">
     <h1>Approach sectors</h1>
     <div class="sub" id="sourceLine"></div>
+
+    <section>
+      <h2>Map display</h2>
+      <label class="check"><input type="checkbox" id="dimToggle" checked>Dark overlay on base map</label>
+      <div class="sliderRow" id="dimControls">
+        <label for="dimOpacity"><span>Overlay opacity</span><b id="dimOut"></b></label>
+        <input id="dimOpacity" type="range" min="5" max="95" step="5" value="55">
+      </div>
+    </section>
 
     <section>
       <h2>Altitude</h2>
@@ -455,6 +464,16 @@ map.createPane("refPane").style.zIndex = 390;
 const refLayer = L.layerGroup().addTo(map);
 const sectorLayer = L.layerGroup().addTo(map);
 const markerLayer = L.layerGroup().addTo(map);
+
+// Plain grey "tiles" above the map tiles and below every sector, so it pans and zooms with the map.
+const DimLayer = L.GridLayer.extend({
+    createTile() {
+        const tile = document.createElement("div");
+        tile.style.background = "#262626";
+        return tile;
+    }
+});
+const dimLayer = new DimLayer({ zIndex: 10, opacity: 0.55 }).addTo(map);
 
 function hexToHsl(hex) {
     const n = parseInt(hex.slice(1), 16);
@@ -758,7 +777,7 @@ byId("sourceLine").innerHTML =
 
 Object.entries(runwayAirports).forEach(([ad, info]) => {
     const row = document.createElement("div");
-    row.className = "adRow";
+    row.className = "runwayRow";
     const options = ["any", ...[...info.runways].sort()];
     row.innerHTML = `<span class="name">${escapeHtml(ad)} ${escapeHtml(info.app.name)}</span>
         <div class="seg">${options.map(o => `<button data-v="${o}">${o === "any" ? "Any" : "RWY " + o}</button>`).join("")}</div>
@@ -794,6 +813,22 @@ Object.keys(DATA.groups).forEach(group => addCheck(byId("refControls"), REF_LABE
 }));
 
 byId("labelsToggle").addEventListener("change", e => { state.labels = e.target.checked; drawLabels(); });
+
+function updateDimOverlay() {
+    const on = byId("dimToggle").checked;
+    const percent = +byId("dimOpacity").value;
+    byId("dimOut").textContent = percent + "%";
+    byId("dimControls").hidden = !on;
+    if (on) {
+        dimLayer.addTo(map);
+        dimLayer.setOpacity(percent / 100);
+    } else {
+        map.removeLayer(dimLayer);
+    }
+}
+byId("dimToggle").addEventListener("change", updateDimOverlay);
+byId("dimOpacity").addEventListener("input", updateDimOverlay);
+updateDimOverlay();
 byId("notPublished").textContent = "No sectors in ENR 2.2.4.2 for: " + DATA.notPublished.join(", ") + ".";
 
 
