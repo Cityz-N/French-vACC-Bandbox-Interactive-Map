@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>French vACC Approach Sectors</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root {
+    --panel-bg: rgba(15, 15, 15, 0.92);
+    --panel-text: #ffffff;
+    --panel-muted: #a8a8a8;
+    --panel-line: rgba(255, 255, 255, 0.14);
+    --panel-hover: rgba(255, 255, 255, 0.08);
+    --button-bg: rgba(30, 30, 30, 0.95);
+    --button-text: #ffffff;
+    --search-bg: rgba(20, 20, 20, 0.95);
+    --search-text: #ffffff;
+    --accent: #4fc3f7;
+    --warn: #ffb74d;
+}
+body.light {
+    --panel-bg: rgba(255, 255, 255, 0.93);
+    --panel-text: #111111;
+    --panel-muted: #5c5c5c;
+    --panel-line: rgba(0, 0, 0, 0.14);
+    --panel-hover: rgba(0, 0, 0, 0.06);
+    --button-bg: rgba(255, 255, 255, 0.95);
+    --button-text: #111111;
+    --search-bg: rgba(255, 255, 255, 0.95);
+    --search-text: #111111;
+    --accent: #0277bd;
+    --warn: #b45f06;
+}
+body { margin: 0; padding: 0; overflow: hidden; font-family: Arial, Helvetica, sans-serif; }
+#map { width: 100vw; height: 100vh; }
+.dark-map-tiles { filter: invert(1) hue-rotate(180deg) brightness(0.75) contrast(1.1); }
+
+#searchBox {
+    position: fixed; z-index: 1000; top: 15px; left: 50%; transform: translateX(-50%);
+    width: min(350px, 46vw); padding: 10px 14px; border: none; border-radius: 12px;
+    background: var(--search-bg); color: var(--search-text); font-size: 15px; outline: none; box-sizing: border-box;
+}
+.topButton {
+    position: fixed; z-index: 1000; top: 15px; padding: 10px 15px; border: none; border-radius: 12px;
+    background: var(--button-bg); color: var(--button-text); cursor: pointer; font-size: 14px;
+}
+#themeButton { right: 15px; }
+#panelButton { left: 15px; display: none; }
+
+#panel {
+    position: fixed; z-index: 1000; left: 15px; top: 15px; bottom: 66px; width: 330px; max-width: calc(100vw - 30px);
+    box-sizing: border-box; display: flex; flex-direction: column;
+    border-radius: 12px; background: var(--panel-bg); color: var(--panel-text);
+    backdrop-filter: blur(8px); font-size: 13px; overflow: hidden;
+}
+#panelScroll { overflow-y: auto; padding: 12px 14px 14px; flex: 1; }
+#panel h1 { font-size: 15px; margin: 0; }
+.sub { color: var(--panel-muted); font-size: 12px; line-height: 1.4; }
+.sub a, #panel a { color: var(--accent); }
+section { border-top: 1px solid var(--panel-line); margin-top: 11px; padding-top: 10px; }
+h2 { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; margin: 0 0 7px; color: var(--panel-muted); font-weight: 700; }
+
+.seg { display: flex; border: 1px solid var(--panel-line); border-radius: 8px; overflow: hidden; }
+.seg button { flex: 1; border: 0; background: transparent; color: var(--panel-text); padding: 6px 4px; cursor: pointer; font-size: 12.5px; }
+.seg button + button { border-left: 1px solid var(--panel-line); }
+.seg button.on { background: var(--accent); color: #06202c; font-weight: 700; }
+body.light .seg button.on { color: #fff; }
+
+.sliderRow { margin-top: 10px; }
+.sliderRow label { display: flex; justify-content: space-between; font-size: 12px; color: var(--panel-muted); }
+.sliderRow b { color: var(--panel-text); font-size: 15px; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; margin: 5px 0 0; accent-color: var(--accent); }
+.ticks { position: relative; height: 6px; margin: 0 8px; }
+.ticks i { position: absolute; top: 0; width: 1px; height: 6px; background: var(--panel-muted); opacity: .75; }
+.inlineField { display: flex; align-items: center; justify-content: space-between; margin-top: 9px; gap: 8px; }
+.inlineField input {
+    width: 72px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--panel-line);
+    background: transparent; color: var(--panel-text); font-size: 13px;
+}
+.status { margin-top: 8px; font-weight: 700; }
+.status.empty { color: var(--warn); }
+
+.check { display: flex; align-items: flex-start; gap: 7px; padding: 3px 0; cursor: pointer; line-height: 1.3; }
+.check input { margin: 1px 0 0; accent-color: var(--accent); flex: none; }
+.adRow { margin-bottom: 4px; }
+.adRow .name { display: block; margin-bottom: 5px; }
+.note { color: var(--panel-muted); font-size: 11.5px; line-height: 1.4; margin: 6px 0 0; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 11.5px; color: var(--panel-muted); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend svg { width: 22px; height: 8px; }
+
+.treeTools { display: flex; gap: 6px; margin-bottom: 6px; }
+.treeTools button {
+    flex: 1; border: 1px solid var(--panel-line); background: transparent; color: var(--panel-text);
+    border-radius: 7px; padding: 5px 2px; font-size: 12px; cursor: pointer;
+}
+.treeTools button:hover { background: var(--panel-hover); }
+details.app summary { display: flex; align-items: center; gap: 7px; padding: 3px 2px; cursor: pointer; list-style: none; border-radius: 5px; }
+details.app summary::-webkit-details-marker { display: none; }
+details.app summary:hover { background: var(--panel-hover); }
+.caret { width: 9px; flex: none; color: var(--panel-muted); font-size: 10px; }
+details.app[open] .caret { transform: rotate(90deg); }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.appName { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.count { color: var(--panel-muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.sectorRow { display: flex; align-items: flex-start; gap: 7px; padding: 3px 0 3px 18px; }
+.sectorRow > input { margin-top: 3px; accent-color: var(--accent); flex: none; }
+.sectorId { min-width: 34px; font-weight: 700; }
+.chips { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; }
+.chip {
+    border: 1px solid var(--panel-line); background: transparent; color: var(--panel-muted);
+    border-radius: 5px; padding: 1px 5px; font-size: 11px; cursor: pointer; min-width: 18px;
+}
+.chip.on { color: var(--panel-text); background: var(--panel-hover); border-color: var(--panel-muted); }
+.chip.rwy { border-style: dashed; }
+
+.infoBar {
+    position: fixed; z-index: 1000; left: 15px; bottom: 15px; display: flex; align-items: center; gap: 10px;
+    padding: 8px 14px; border-radius: 12px; background: var(--panel-bg); color: var(--panel-text);
+    font-size: 13px; backdrop-filter: blur(8px); max-width: calc(100vw - 60px); box-sizing: border-box;
+}
+.infoBar a { color: var(--accent); white-space: nowrap; }
+.logoContainer { height: 22px; display: flex; align-items: center; }
+.logoContainer.lightMode { background: #000; padding: 3px 7px; border-radius: 7px; }
+.logoContainer img { height: 20px; width: auto; display: block; }
+
+.radarMarker { width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 6px currentColor; }
+.leaflet-tooltip { background: rgba(15,15,15,.95); color: #fff; border: none; border-radius: 8px; padding: 6px 10px; font-size: 12.5px; line-height: 1.4; }
+.leaflet-tooltip-top:before { border-top-color: rgba(15,15,15,.95); }
+.leaflet-tooltip.sectorLabel {
+    background: transparent; box-shadow: none; padding: 0; font-size: 11px; font-weight: 700; color: #fff;
+    text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 2px #000;
+}
+.leaflet-tooltip.sectorLabel:before { display: none; }
+.leaflet-tooltip.sectorLabel.hidden { visibility: hidden; }
+body.light .leaflet-tooltip.sectorLabel { color: #111; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff; }
+
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--panel-bg); color: var(--panel-text); }
+.leaflet-popup-content { margin: 11px 13px; font-size: 12.5px; line-height: 1.4; max-height: 46vh; overflow-y: auto; min-width: 250px; }
+.leaflet-container a.leaflet-popup-close-button { color: var(--panel-muted); }
+.stackItem { padding: 6px 0; border-top: 1px solid var(--panel-line); }
+.stackItem:first-child { border-top: 0; padding-top: 0; }
+.stackHead { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.stackHead .lim { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tag { display: inline-block; font-size: 11px; color: var(--warn); margin: 3px 6px 0 0; }
+.tag.ok { color: var(--panel-muted); }
+.remark { color: var(--panel-muted); font-size: 11.5px; margin-top: 3px; }
+
+@media (max-width: 720px) {
+    #panelButton { display: block; }
+    #panel { top: 62px; bottom: 100px; display: none; }
+    #panel.open { display: flex; }
+    .infoBar { bottom: 50px; }
+    #searchBox { left: auto; right: 90px; transform: none; width: calc(100vw - 210px); font-size: 14px; }
+    .infoBar span.title { display: none; }
+}
+</style>
+</head>
+<body>
+
+<input id="searchBox" placeholder="Search city, approach, callsign or sector..." aria-label="Search">
+<button id="panelButton" class="topButton">☰ Sectors</button>
+<button id="themeButton" class="topButton">☀ Light</button>
+
+<div id="map"></div>
+
+<aside id="panel">
+  <div id="panelScroll">
+    <h1>Approach sectors</h1>
+    <div class="sub" id="sourceLine"></div>
+
+    <section>
+      <h2>Altitude</h2>
+      <div class="seg" id="modeSeg">
+        <button data-mode="all">All levels</button>
+        <button data-mode="level">Level</button>
+        <button data-mode="band">Band</button>
+      </div>
+      <div id="levelControls" class="sliderRow">
+        <label for="levelSlider"><span>Level</span><b id="levelOut"></b></label>
+        <input id="levelSlider" type="range" min="0" max="195" step="1">
+        <div class="ticks" id="levelTicks"></div>
+      </div>
+      <div id="bandControls" hidden>
+        <div class="sliderRow">
+          <label for="bandTop"><span>Band ceiling</span><b id="bandTopOut"></b></label>
+          <input id="bandTop" type="range" min="0" max="195" step="1">
+        </div>
+        <div class="sliderRow">
+          <label for="bandBottom"><span>Band floor</span><b id="bandBottomOut"></b></label>
+          <input id="bandBottom" type="range" min="0" max="195" step="1">
+        </div>
+      </div>
+      <div class="inlineField">
+        <label for="qnh">QNH (hPa), shifts AMSL limits against FL</label>
+        <input id="qnh" type="number" min="940" max="1060" step="1" value="1013">
+      </div>
+      <div class="status" id="status"></div>
+      <div class="legend">
+        <span><svg viewBox="0 0 22 8"><line x1="0" y1="4" x2="22" y2="4" stroke="currentColor" stroke-width="2"/></svg>Fixed</span>
+        <span><svg viewBox="0 0 22 8"><line x1="0" y1="4" x2="22" y2="4" stroke="currentColor" stroke-width="2" stroke-dasharray="6 3"/></svg>Runway-dependent</span>
+        <span><svg viewBox="0 0 22 8"><line x1="0" y1="4" x2="22" y2="4" stroke="currentColor" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round"/></svg>Floor follows terrain</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>Runway in use</h2>
+      <div id="rwyControls"></div>
+    </section>
+
+    <section>
+      <h2>Active airspace (cuts sectors)</h2>
+      <div id="condControls"></div>
+      <p class="note">Provence sectors also exclude active MIL airspace. The AIP does not name those areas here, so they cannot be cut out; affected sectors are flagged when clicked.</p>
+    </section>
+
+    <section>
+      <h2>Show reference airspace</h2>
+      <div id="refControls"></div>
+    </section>
+
+    <section>
+      <h2>Approaches</h2>
+      <div class="treeTools">
+        <button id="selectAll">All</button>
+        <button id="selectNone">None</button>
+        <button id="fitSelected">Zoom to selection</button>
+      </div>
+      <label class="check"><input type="checkbox" id="labelsToggle" checked>Sector labels</label>
+      <div id="tree"></div>
+      <p class="note" id="notPublished"></p>
+    </section>
+  </div>
+</aside>
+
+<div class="infoBar">
+  <span id="logoContainer" class="logoContainer"><img src="https://vatsim.fr/assets/img/logo_light.png" alt="VATSIM France"></span>
+  <span class="title">Approach sectors, ENR 2.2.4.2</span>
+  <a href="index.html">← Bandbox map</a>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js"></script>
+<script src="approach-sectors-data.js"></script>
+<script>
+"use strict";
+
+const DATA = window.APPROACH_SECTORS;
+const HPA_FT = 28;               // ft per hPa, to compare AMSL limits against flight levels
+const FLOOR = -1000, CEIL = 60000;
+
+const REF_LABELS = {
+    "tma-paris-a": "TMA Paris class A",
+    "cta-rhone-2": "CTA Rhône part 2",
+    "cta-rhone-3": "CTA Rhône part 3",
+    "cta-rhone-4": "CTA Rhône part 4",
+    "channel-islands": "Channel Islands (French part)",
+    "ctr-lfrk": "CTR Caen (LFRK)",
+    "ctr-lfrg": "CTR Deauville (LFRG)",
+    "lf-p": "LF-P prohibited areas (referenced)",
+    "siv-lille": "SIV Lille",
+    "siv-seine": "SIV Seine"
+};
+
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const byId = id => document.getElementById(id);
+
+
+/* =========================
+   DATA MODEL
+   ========================= */
+
+const toMultiPolygon = rings => [rings.map(r => r.map(([la, lo]) => [lo, la]))];
+
+const allParts = [];
+const partsBySector = new Map();
+
+DATA.apps.forEach(app => app.sectors.forEach((sector, sectorIndex) => {
+    sector.app = app;
+    sector.index = sectorIndex;
+    partsBySector.set(app.id + "/" + sector.id, sector.parts);
+    sector.parts.forEach(part => {
+        part.app = app;
+        part.sector = sector;
+        part.label = sector.id + part.part;
+        part.mp = toMultiPolygon(part.rings);
+        allParts.push(part);
+    });
+}));
+
+Object.entries(DATA.refs).forEach(([id, ref]) => {
+    ref.id = id;
+    ref.mp = toMultiPolygon(ref.rings);
+});
+
+
+/* =========================
+   STATE
+   ========================= */
+
+const state = {
+    selected: new Set(allParts.map(p => p.code)),
+    mode: "level",
+    level: 100,
+    bandBottom: 65,
+    bandTop: 145,
+    qnh: 1013,
+    rwy: {},
+    cond: Object.fromEntries(Object.keys(DATA.conditions).map(k => [k, false])),
+    refs: new Set(),
+    labels: true
+};
+
+// Opened from a Bandbox map marker: show only that approach, at every level so no part is hidden.
+const linkedApp = DATA.apps.find(a => a.callsign === new URLSearchParams(location.search).get("app"));
+if (linkedApp) {
+    state.selected = new Set(linkedApp.sectors.flatMap(s => s.parts.map(p => p.code)));
+    state.mode = "all";
+    document.title = linkedApp.name + " sectors";
+}
+
+const runwayAirports = {};
+allParts.filter(p => p.rwy).forEach(p => {
+    const ad = p.code.slice(0, 4);
+    (runwayAirports[ad] = runwayAirports[ad] || { app: p.app, runways: new Set(), parts: [] });
+    runwayAirports[ad].runways.add(p.rwy);
+    runwayAirports[ad].parts.push(p);
+    state.rwy[ad] = "any";
+});
+
+const airportOf = part => part.code.slice(0, 4);
+
+
+/* =========================
+   VERTICAL LOGIC
+   All comparisons are done in pressure altitude (ft), i.e. FL x 100.
+   ========================= */
+
+function limitRange(limits, terrain) {
+    const shift = (1013 - state.qnh) * HPA_FT;
+    const ranges = limits.map(l => {
+        if (l.t === "FL") return [l.v * 100, l.v * 100];
+        if (l.t === "AMSL") return [l.v + shift, l.v + shift];
+        if (l.t === "SFC") return [FLOOR, FLOOR];
+        const t = terrain || { minFt: 0, maxFt: 0 };          // ASFC
+        return [l.v + t.minFt + shift, l.v + t.maxFt + shift];
+    });
+    // Two published limits ("2500ft AMSL / 1000ft ASFC") mean the higher of the two.
+    return [Math.max(...ranges.map(r => r[0])), Math.max(...ranges.map(r => r[1]))];
+}
+
+function verticalOf(item) {
+    const [lowMin, lowMax] = limitRange(item.lower, item.terrain);
+    const high = limitRange(item.upper, item.terrain)[1];
+    return { lowMin, lowMax, high };
+}
+
+function currentBand() {
+    if (state.mode === "level") return [state.level * 100, state.level * 100];
+    if (state.mode === "band") return [state.bandBottom * 100, state.bandTop * 100];
+    return [FLOOR, CEIL];
+}
+
+function intersectsBand(low, high, [a, b]) {
+    if (a === b) return low <= a && a <= high;     // on a shared limit both neighbours apply
+    return low < b && high > a;
+}
+
+function runwayApplies(part) {
+    if (!part.rwy) return true;
+    const chosen = state.rwy[airportOf(part)];
+    return chosen === "any" || chosen === part.rwy;
+}
+
+
+/* =========================
+   EXCLUSIONS
+   ========================= */
+
+function excludersOf(part) {
+    const out = [];
+    part.excl.forEach(e => {
+        if (e.cond && !state.cond[e.cond]) return;
+        if (e.kind === "sector") {
+            partsBySector.get(part.app.id + "/" + e.id).forEach(other => {
+                // With no runway chosen a runway-dependent sector cannot be said to be cutting anything.
+                if (other.rwy && state.rwy[airportOf(other)] !== other.rwy) return;
+                out.push(other);
+            });
+        } else if (e.kind === "ref") {
+            out.push(DATA.refs[e.id]);
+        } else {
+            DATA.groups[e.id].forEach(id => out.push(DATA.refs[id]));
+        }
+    });
+    return out;
+}
+
+const clipCache = new Map();
+
+function resolveGeometry(part, band, vertical) {
+    const low = Math.max(vertical.lowMin, band[0]);
+    const high = Math.min(vertical.high, band[1]);
+
+    const candidates = excludersOf(part)
+        .map(x => ({ item: x, v: verticalOf(x) }))
+        .filter(c => (low === high)
+            ? c.v.lowMin <= low && low <= c.v.high
+            : c.v.lowMin < high && c.v.high > low);
+    if (!candidates.length) return { mp: part.mp };
+
+    const key = [part.code, low, high, candidates.map(c => c.item.code || c.item.id).join()].join("|");
+    if (clipCache.has(key)) return clipCache.get(key);
+
+    // Cut the part into slices at every excluder limit: a volume only disappears from the
+    // 2D picture when it is excluded across the whole displayed height.
+    const cuts = [...new Set([low, high, ...candidates.flatMap(c => [c.v.lowMin, c.v.high])
+        .filter(x => x > low && x < high)])].sort((a, b) => a - b);
+    const slices = low === high ? [[low, low]] : cuts.slice(1).map((x, i) => [cuts[i], x]);
+
+    let result;
+    try {
+        const pieces = slices.map(([a, b]) => {
+            const masks = candidates.filter(c => c.v.lowMin <= a && c.v.high >= b).map(c => c.item.mp);
+            return masks.length ? polygonClipping.difference(part.mp, ...masks) : part.mp;
+        });
+        result = { mp: pieces.length > 1 ? polygonClipping.union(...pieces) : pieces[0] };
+    } catch (err) {
+        console.warn("Could not apply exclusions to", part.code, err);
+        result = { mp: part.mp, clipFailed: true };
+    }
+    if (clipCache.size > 3000) clipCache.clear();
+    clipCache.set(key, result);
+    return result;
+}
+
+
+/* =========================
+   MAP
+   ========================= */
+
+let darkMode = true;
+const map = L.map("map", { zoomControl: false }).setView([46.7, 2.3], 6);
+L.control.zoom({ position: "bottomright" }).addTo(map);
+
+const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a>' +
+    ' | Sectors: <a href="' + escapeHtml(DATA.source) + '" target="_blank">SIA eAIP</a>, not for real-world navigation';
+const darkTiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution, className: "dark-map-tiles" }).addTo(map);
+const lightTiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution });
+
+map.createPane("refPane").style.zIndex = 390;
+const refLayer = L.layerGroup().addTo(map);
+const sectorLayer = L.layerGroup().addTo(map);
+const markerLayer = L.layerGroup().addTo(map);
+
+function hexToHsl(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+    const l = (max + min) / 2;
+    if (!d) return [0, 0, l * 100];
+    const s = d / (1 - Math.abs(2 * l - 1));
+    const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return [(h * 60 + 360) % 360, s * 100, l * 100];
+}
+
+function sectorColor(part) {
+    const [h, s, l] = hexToHsl(part.app.color);
+    const n = part.app.sectors.length;
+    const offset = n > 1 ? part.sector.index / (n - 1) - 0.5 : 0;
+    return `hsl(${(h + offset * 34 + 360) % 360} ${Math.max(s, 55)}% ${Math.min(72, Math.max(44, l + offset * 22))}%)`;
+}
+
+const toLeaflet = mp => mp.map(poly => poly.map(ring => ring.map(([lng, lat]) => [lat, lng])));
+
+function ringArea(ring) {
+    let area = 0;
+    for (let i = 0; i < ring.length - 1; i++) {
+        area += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+    }
+    return area / 2;
+}
+
+function pointInRing([x, y], ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i], [xj, yj] = ring[j];
+        if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+}
+
+const pointInPolygon = (pt, poly) => poly.reduce((acc, ring) => pointInRing(pt, ring) ? !acc : acc, false);
+const pointInMultiPolygon = (pt, mp) => mp.some(poly => pointInPolygon(pt, poly));
+
+function labelPoint(mp) {
+    const poly = mp.reduce((best, p) => Math.abs(ringArea(p[0])) > Math.abs(ringArea(best[0])) ? p : best);
+    const ring = poly[0];
+    let cx = 0, cy = 0, a = 0;
+    for (let i = 0; i < ring.length - 1; i++) {
+        const f = ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+        cx += (ring[i][0] + ring[i + 1][0]) * f;
+        cy += (ring[i][1] + ring[i + 1][1]) * f;
+        a += f;
+    }
+    const centroid = a ? [cx / (3 * a), cy / (3 * a)] : ring[0];
+    if (pointInPolygon(centroid, poly)) return centroid;
+
+    // Concave shape: use the middle of the widest interior span on a few scan lines.
+    const ys = ring.map(p => p[1]), yMin = Math.min(...ys), yMax = Math.max(...ys);
+    let best = ring[0], bestWidth = -1;
+    for (let k = 1; k < 12; k++) {
+        const y = yMin + (yMax - yMin) * k / 12;
+        const xs = [];
+        poly.forEach(r => {
+            for (let i = 0; i < r.length - 1; i++) {
+                const [x1, y1] = r[i], [x2, y2] = r[i + 1];
+                if ((y1 > y) !== (y2 > y)) xs.push(x1 + (y - y1) / (y2 - y1) * (x2 - x1));
+            }
+        });
+        xs.sort((p, q) => p - q);
+        for (let i = 0; i + 1 < xs.length; i += 2) {
+            if (xs[i + 1] - xs[i] > bestWidth) { bestWidth = xs[i + 1] - xs[i]; best = [(xs[i] + xs[i + 1]) / 2, y]; }
+        }
+    }
+    return best;
+}
+
+function formatLimit(limits) {
+    return limits.map(l => {
+        if (l.t === "FL") return "FL" + String(l.v).padStart(3, "0");
+        if (l.t === "SFC") return "SFC";
+        return l.v + " ft " + l.t;
+    }).join(" / ");
+}
+const formatVertical = x => formatLimit(x.lower) + " – " + formatLimit(x.upper);
+
+
+/* =========================
+   RENDER
+   ========================= */
+
+let drawn = [];
+
+function render() {
+    sectorLayer.clearLayers();
+    refLayer.clearLayers();
+    markerLayer.clearLayers();
+    drawn = [];
+
+    const band = currentBand();
+    const isAll = state.mode === "all";
+    const shownByApp = new Map();
+
+    allParts.forEach(part => {
+        if (!state.selected.has(part.code) || !runwayApplies(part)) return;
+        const vertical = verticalOf(part);
+        if (!intersectsBand(vertical.lowMin, vertical.high, band)) return;
+
+        const resolved = resolveGeometry(part, band, vertical);
+        if (!resolved.mp.length) return;
+
+        const terrainDependent = vertical.lowMax > vertical.lowMin && band[1] < vertical.lowMax;
+        const color = sectorColor(part);
+        const style = {
+            color, weight: 1.6, fillColor: color,
+            fillOpacity: (isAll ? 0.07 : 0.26) * (terrainDependent ? 0.6 : 1),
+            dashArray: terrainDependent ? "1 5" : part.rwy ? "7 4" : null
+        };
+        const layer = L.polygon(toLeaflet(resolved.mp), style).addTo(sectorLayer);
+        layer.bindTooltip(
+            `<b>${escapeHtml(part.label)}</b> ${escapeHtml(part.app.name)}<br>${escapeHtml(formatVertical(part))}`,
+            { sticky: true }
+        );
+        layer.on("mouseover", () => layer.setStyle({ weight: 3 }));
+        layer.on("mouseout", () => layer.setStyle({ weight: 1.6 }));
+        drawn.push({ part, layer, mp: resolved.mp, terrainDependent, clipFailed: resolved.clipFailed });
+        shownByApp.set(part.app.id, (shownByApp.get(part.app.id) || 0) + 1);
+    });
+
+    state.refs.forEach(group => DATA.groups[group].forEach(id => {
+        const ref = DATA.refs[id];
+        const v = verticalOf(ref);
+        if (!intersectsBand(v.lowMin, v.high, band)) return;
+        L.polygon(toLeaflet(ref.mp), {
+            pane: "refPane", color: "#bdbdbd", weight: 1.2, dashArray: "3 4", fillColor: "#9e9e9e", fillOpacity: 0.16
+        }).addTo(refLayer).bindTooltip(
+            `<b>${escapeHtml(ref.name)}</b><br>${escapeHtml(formatVertical(ref))}`, { sticky: true }
+        );
+    }));
+
+    DATA.apps.forEach(app => {
+        if (!app.sectors.some(s => s.parts.some(p => state.selected.has(p.code)))) return;
+        const icon = L.divIcon({
+            className: "",
+            html: `<div class="radarMarker" style="background:${app.color};color:${app.color}"></div>`,
+            iconSize: [16, 16], iconAnchor: [8, 8]
+        });
+        L.marker([app.lat, app.lon], { icon, keyboard: false }).addTo(markerLayer).bindTooltip(
+            `${escapeHtml(app.city)}<br>${escapeHtml(app.name)}<br>${escapeHtml(app.callsign)}`,
+            { direction: "top", offset: [0, -8] }
+        );
+    });
+
+    drawLabels();
+    updateStatus(shownByApp);
+    updateTreeState(shownByApp);
+    drawTicks();
+}
+
+let labels = [];
+
+function drawLabels() {
+    labels.forEach(t => map.removeLayer(t));
+    labels = [];
+    if (!state.labels) return;
+    const ordered = [...drawn].sort((a, b) => Math.abs(ringArea(b.mp[0][0])) - Math.abs(ringArea(a.mp[0][0])));
+    ordered.forEach(d => {
+        const [lng, lat] = labelPoint(d.mp);
+        const tip = L.tooltip({ permanent: true, direction: "center", className: "sectorLabel", interactive: false })
+            .setLatLng([lat, lng]).setContent(escapeHtml(d.part.label)).addTo(map);
+        labels.push(tip);
+    });
+    declutterLabels();
+}
+
+function declutterLabels() {
+    const kept = [];
+    labels.forEach(tip => {
+        const el = tip.getElement();
+        if (!el) return;
+        el.classList.remove("hidden");
+        const r = el.getBoundingClientRect();
+        if (kept.some(k => r.left < k.right + 2 && r.right > k.left - 2 && r.top < k.bottom + 1 && r.bottom > k.top - 1)) {
+            el.classList.add("hidden");
+        } else {
+            kept.push(r);
+        }
+    });
+}
+map.on("zoomend moveend", declutterLabels);
+
+const flText = fl => "FL" + String(fl).padStart(3, "0");
+
+function updateStatus(shownByApp) {
+    const total = [...shownByApp.values()].reduce((a, b) => a + b, 0);
+    const el = byId("status");
+    el.classList.toggle("empty", total === 0);
+    el.textContent = total === 0
+        ? (state.selected.size ? "Nothing at this altitude for the selection" : "No sectors selected")
+        : `${total} sector part${total === 1 ? "" : "s"} shown, ${shownByApp.size} approach${shownByApp.size === 1 ? "" : "es"}`;
+
+    const amsl = fl => (fl * 100 - (1013 - state.qnh) * HPA_FT).toLocaleString("en-GB") + " ft";
+    byId("levelOut").textContent = `${flText(state.level)} · ${amsl(state.level)}`;
+    byId("bandTopOut").textContent = flText(state.bandTop);
+    byId("bandBottomOut").textContent = flText(state.bandBottom);
+}
+
+function drawTicks() {
+    const box = byId("levelTicks");
+    const limits = new Set();
+    allParts.forEach(p => {
+        if (!state.selected.has(p.code)) return;
+        [p.lower, p.upper].forEach(list => list.forEach(l => {
+            if (l.t === "FL") limits.add(l.v);
+            else if (l.t === "AMSL") limits.add(Math.round((l.v + (1013 - state.qnh) * HPA_FT) / 100));
+        }));
+    });
+    box.innerHTML = [...limits].filter(v => v >= 0 && v <= 195)
+        .map(v => `<i style="left:${(v / 195 * 100).toFixed(2)}%" title="${flText(v)}"></i>`).join("");
+}
+
+
+/* =========================
+   CLICK: VERTICAL STACK AT A POINT
+   ========================= */
+
+function describe(entry) {
+    const { part, terrainDependent, clipFailed } = entry;
+    const tags = [];
+    if (part.rwy) tags.push(`<span class="tag">RWY ${escapeHtml(part.rwy)} in use only</span>`);
+    if (terrainDependent) {
+        tags.push(`<span class="tag">Floor varies with terrain (SRTM sampled ${part.terrain.minFt}–${part.terrain.maxFt} ft)</span>`);
+    }
+    if (part.mil) tags.push('<span class="tag">Excludes active MIL airspace (not drawn)</span>');
+    if (clipFailed) tags.push('<span class="tag">Exclusions could not be drawn</span>');
+    part.excl.forEach(e => {
+        const on = !e.cond || state.cond[e.cond];
+        const name = e.kind === "sector" ? "sector " + e.id
+            : e.cond ? DATA.conditions[e.cond].replace(" active", "")
+            : (REF_LABELS[e.id] || (DATA.refs[e.id] && DATA.refs[e.id].name) || e.id);
+        tags.push(`<span class="tag ok">${on ? "Excludes" : "Would exclude"} ${escapeHtml(name)}${on ? "" : " when active"}</span>`);
+    });
+    return `<div class="stackItem">
+        <div class="stackHead"><span class="dot" style="background:${sectorColor(part)}"></span>
+        <span>${escapeHtml(part.label)}</span>
+        <span class="lim">${escapeHtml(formatVertical(part))}</span></div>
+        <div class="sub">${escapeHtml(part.app.name)} · ${escapeHtml(part.code)}</div>
+        ${tags.join("")}
+        ${part.remark ? `<div class="remark">AIP: ${escapeHtml(part.remark)}</div>` : ""}
+    </div>`;
+}
+
+map.on("click", e => {
+    const pt = [e.latlng.lng, e.latlng.lat];
+    const here = drawn.filter(d => pointInMultiPolygon(pt, d.mp))
+        .sort((a, b) => verticalOf(a.part).lowMin - verticalOf(b.part).lowMin);
+    if (!here.length) return;
+    L.popup({ maxWidth: 340 }).setLatLng(e.latlng).setContent(here.map(describe).join("")).openOn(map);
+});
+
+
+/* =========================
+   CONTROLS
+   ========================= */
+
+function setMode(mode) {
+    state.mode = mode;
+    [...byId("modeSeg").children].forEach(b => b.classList.toggle("on", b.dataset.mode === mode));
+    byId("levelControls").hidden = mode !== "level";
+    byId("bandControls").hidden = mode !== "band";
+    scheduleRender();
+}
+byId("modeSeg").addEventListener("click", e => { if (e.target.dataset.mode) setMode(e.target.dataset.mode); });
+
+let renderQueued = false;
+function scheduleRender() {
+    if (renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(() => { renderQueued = false; render(); });
+}
+
+byId("levelSlider").value = state.level;
+byId("bandTop").value = state.bandTop;
+byId("bandBottom").value = state.bandBottom;
+
+byId("levelSlider").addEventListener("input", e => { state.level = +e.target.value; scheduleRender(); });
+byId("bandTop").addEventListener("input", e => {
+    state.bandTop = Math.max(+e.target.value, state.bandBottom + 1);
+    e.target.value = state.bandTop;
+    scheduleRender();
+});
+byId("bandBottom").addEventListener("input", e => {
+    state.bandBottom = Math.min(+e.target.value, state.bandTop - 1);
+    e.target.value = state.bandBottom;
+    scheduleRender();
+});
+byId("qnh").addEventListener("input", e => {
+    const v = +e.target.value;
+    if (v >= 940 && v <= 1060) { state.qnh = v; clipCache.clear(); scheduleRender(); }
+});
+
+byId("sourceLine").innerHTML =
+    `ENR 2.2.4.2, AIRAC ${escapeHtml(DATA.airac)} (<a href="${escapeHtml(DATA.source)}" target="_blank" rel="noopener">SIA eAIP</a>). For simulation use only.`;
+
+Object.entries(runwayAirports).forEach(([ad, info]) => {
+    const row = document.createElement("div");
+    row.className = "adRow";
+    const options = ["any", ...[...info.runways].sort()];
+    row.innerHTML = `<span class="name">${escapeHtml(ad)} ${escapeHtml(info.app.name)}</span>
+        <div class="seg">${options.map(o => `<button data-v="${o}">${o === "any" ? "Any" : "RWY " + o}</button>`).join("")}</div>
+        <p class="note">Only ${escapeHtml(info.parts.map(p => p.label).join(", "))} depend on the runway in the AIP.</p>`;
+    const seg = row.querySelector(".seg");
+    const sync = () => [...seg.children].forEach(b => b.classList.toggle("on", b.dataset.v === state.rwy[ad]));
+    seg.addEventListener("click", e => {
+        if (!e.target.dataset.v) return;
+        state.rwy[ad] = e.target.dataset.v;
+        sync();
+        scheduleRender();
+    });
+    sync();
+    byId("rwyControls").appendChild(row);
+});
+
+function addCheck(container, text, checked, onChange) {
+    const label = document.createElement("label");
+    label.className = "check";
+    label.innerHTML = `<input type="checkbox"${checked ? " checked" : ""}><span>${escapeHtml(text)}</span>`;
+    label.querySelector("input").addEventListener("change", e => onChange(e.target.checked));
+    container.appendChild(label);
+}
+
+Object.entries(DATA.conditions).forEach(([id, text]) => addCheck(byId("condControls"), text, false, on => {
+    state.cond[id] = on;
+    scheduleRender();
+}));
+
+Object.keys(DATA.groups).forEach(group => addCheck(byId("refControls"), REF_LABELS[group] || group, false, on => {
+    on ? state.refs.add(group) : state.refs.delete(group);
+    scheduleRender();
+}));
+
+byId("labelsToggle").addEventListener("change", e => { state.labels = e.target.checked; drawLabels(); });
+byId("notPublished").textContent = "No sectors in ENR 2.2.4.2 for: " + DATA.notPublished.join(", ") + ".";
+
+
+/* =========================
+   SELECTION TREE
+   ========================= */
+
+const treeRefs = [];
+
+function setParts(parts, on) {
+    parts.forEach(p => on ? state.selected.add(p.code) : state.selected.delete(p.code));
+    scheduleRender();
+}
+
+DATA.apps.forEach(app => {
+    const appParts = app.sectors.flatMap(s => s.parts);
+    const details = document.createElement("details");
+    details.className = "app";
+    details.innerHTML = `<summary><span class="caret">▶</span>
+        <input type="checkbox" aria-label="${escapeHtml(app.name)}">
+        <span class="dot" style="background:${app.color}"></span>
+        <span class="appName">${escapeHtml(app.name)}</span><span class="count"></span></summary>`;
+    const appBox = details.querySelector("input");
+    appBox.addEventListener("click", e => e.stopPropagation());
+    appBox.addEventListener("change", e => setParts(appParts, e.target.checked));
+
+    const sectorRefs = app.sectors.map(sector => {
+        const row = document.createElement("div");
+        row.className = "sectorRow";
+        row.innerHTML = `<input type="checkbox" aria-label="Sector ${escapeHtml(sector.id)}">
+            <span class="sectorId">${escapeHtml(sector.id)}</span><div class="chips"></div>`;
+        const box = row.querySelector("input");
+        box.addEventListener("change", e => setParts(sector.parts, e.target.checked));
+        const chips = sector.parts.map(part => {
+            const chip = document.createElement("button");
+            chip.className = "chip" + (part.rwy ? " rwy" : "");
+            chip.textContent = part.part || "all";
+            chip.title = formatVertical(part) + (part.rwy ? ` (RWY ${part.rwy})` : "");
+            chip.addEventListener("click", () => setParts([part], !state.selected.has(part.code)));
+            row.querySelector(".chips").appendChild(chip);
+            return { chip, part };
+        });
+        details.appendChild(row);
+        return { sector, box, chips };
+    });
+
+    byId("tree").appendChild(details);
+    treeRefs.push({ app, appParts, details, appBox, count: details.querySelector(".count"), sectorRefs });
+});
+
+function syncCheckbox(box, parts) {
+    const n = parts.filter(p => state.selected.has(p.code)).length;
+    box.checked = n === parts.length;
+    box.indeterminate = n > 0 && n < parts.length;
+}
+
+function updateTreeState(shownByApp) {
+    treeRefs.forEach(t => {
+        syncCheckbox(t.appBox, t.appParts);
+        const selected = t.appParts.filter(p => state.selected.has(p.code)).length;
+        t.count.textContent = selected ? `${shownByApp.get(t.app.id) || 0}/${selected}` : "";
+        t.sectorRefs.forEach(s => {
+            syncCheckbox(s.box, s.sector.parts);
+            s.chips.forEach(({ chip, part }) => chip.classList.toggle("on", state.selected.has(part.code)));
+        });
+    });
+}
+
+byId("selectAll").addEventListener("click", () => setParts(allParts, true));
+byId("selectNone").addEventListener("click", () => setParts(allParts, false));
+byId("fitSelected").addEventListener("click", () => {
+    const parts = allParts.filter(p => state.selected.has(p.code));
+    if (parts.length) map.fitBounds(L.latLngBounds(parts.flatMap(p => p.rings[0])), { padding: [30, 30] });
+});
+
+
+/* =========================
+   SEARCH + THEME + PANEL
+   ========================= */
+
+byId("searchBox").addEventListener("input", function () {
+    const query = this.value.toLowerCase().trim();
+    if (query.length < 2) return;
+
+    const match = allParts.find(p => [p.label, p.code, p.sector.id].some(s => s.toLowerCase() === query))
+        || allParts.find(p => [p.app.city, p.app.name, p.app.callsign, p.app.id].join(" ").toLowerCase().includes(query));
+    if (!match) return;
+
+    const exact = match.label.toLowerCase() === query || match.code.toLowerCase() === query
+        || match.sector.id.toLowerCase() === query;
+    const parts = exact ? match.sector.parts : match.app.sectors.flatMap(s => s.parts);
+    map.flyToBounds(L.latLngBounds(parts.flatMap(p => p.rings[0])), { padding: [30, 30], duration: 1 });
+    const node = treeRefs.find(t => t.app === match.app);
+    if (node) node.details.open = true;
+});
+
+byId("themeButton").addEventListener("click", function () {
+    darkMode = !darkMode;
+    map.removeLayer(darkMode ? lightTiles : darkTiles);
+    (darkMode ? darkTiles : lightTiles).addTo(map);
+    document.body.classList.toggle("light", !darkMode);
+    this.textContent = darkMode ? "☀ Light" : "🌙 Dark";
+    byId("logoContainer").classList.toggle("lightMode", !darkMode);
+});
+
+byId("panelButton").addEventListener("click", () => byId("panel").classList.toggle("open"));
+
+if (linkedApp) {
+    treeRefs.find(t => t.app === linkedApp).details.open = true;
+    const panelWidth = window.innerWidth > 720 ? 360 : 0;       // keep the sectors clear of the panel
+    map.fitBounds(L.latLngBounds(linkedApp.sectors.flatMap(s => s.parts.flatMap(p => p.rings[0]))), {
+        paddingTopLeft: [panelWidth + 20, 70],
+        paddingBottomRight: [30, 30]
+    });
+}
+
+setMode(state.mode);
+</script>
+</body>
+</html>
